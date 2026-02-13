@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Ruler, User, Calendar, CheckCircle, Clock, X, Eye } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const TailorStitchingPage = () => {
   const [assignedWork, setAssignedWork] = useState([]);
