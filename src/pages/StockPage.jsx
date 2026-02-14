@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Package, Plus, X, Search } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 
 const StockPage = () => {
   const [stockData, setStockData] = useState([]);

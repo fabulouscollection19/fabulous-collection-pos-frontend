@@ -65,8 +65,9 @@ function App() {
    const getDefaultRoute = () => {
       if (userRole === 'tailor') {
         return <Navigate to="/tailor-work" replace />;
+      } else if (userRole === 'super-admin') {
+        return <Navigate to="/billing" replace />;
       }
-      // Add default for other roles if needed
       return <Navigate to="/billing" replace />;
     };
 
@@ -104,11 +105,11 @@ function App() {
           {/* Common routes */}
           <Route path="billing" element={<BillingPage />} />
 
-          {/* Admin only routes */}
+          {/* Admin only routes - Super Admin access */}
           <Route
             path="stock"
             element={
-              <ProtectedRoute allowedRoles={['admin1', 'admin2']}>
+              <ProtectedRoute allowedRoles={['super-admin']}>
                 <StockPage />
               </ProtectedRoute>
             }
@@ -116,7 +117,7 @@ function App() {
           <Route
             path="transactions"
             element={
-              <ProtectedRoute allowedRoles={['admin1', 'admin2']}>
+              <ProtectedRoute allowedRoles={['super-admin']}>
                 <TransactionsPage />
               </ProtectedRoute>
             }
@@ -124,7 +125,7 @@ function App() {
           <Route
             path="analytics"
             element={
-              <ProtectedRoute allowedRoles={['admin1']}>
+              <ProtectedRoute allowedRoles={['super-admin']}>
                 <AnalyticsPage />
               </ProtectedRoute>
             }
@@ -132,7 +133,7 @@ function App() {
           <Route
             path="admin"
             element={
-              <ProtectedRoute allowedRoles={['admin1']}>
+              <ProtectedRoute allowedRoles={['super-admin']}>
                 <AdminPage />
               </ProtectedRoute>
             }
@@ -142,7 +143,7 @@ function App() {
           <Route
             path="stitching"
             element={
-              <ProtectedRoute allowedRoles={['admin1', 'admin2']}>
+              <ProtectedRoute allowedRoles={['super-admin']}>
                 <StitchingPage />
               </ProtectedRoute>
             }

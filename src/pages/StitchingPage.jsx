@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Ruler, Calendar, User, Phone, CheckCircle, XCircle, Search } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 
 const StitchingPage = () => {
   const [stitchingData, setStitchingData] = useState([]);

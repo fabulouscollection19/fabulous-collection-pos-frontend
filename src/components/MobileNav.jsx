@@ -28,7 +28,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: Receipt,
       path: '/billing',
       color: 'text-blue-600',
-      roles: ['admin1', 'admin2']
+      roles: ['super-admin']
     },
     {
       id: 'stock',
@@ -36,7 +36,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: Package,
       path: '/stock',
       color: 'text-green-600',
-      roles: ['admin1', 'admin2']
+      roles: ['super-admin']
     },
     {
       id: 'transactions',
@@ -44,7 +44,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: CreditCard,
       path: '/transactions',
       color: 'text-purple-600',
-      roles: ['admin1', 'admin2']
+      roles: ['super-admin']
     }
   ];
 
@@ -56,7 +56,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: Ruler,
       path: '/stitching',
       color: 'text-indigo-600',
-      roles: ['admin1', 'admin2']
+      roles: ['super-admin']
     },
     {
       id: 'analytics',
@@ -64,7 +64,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: BarChart3,
       path: '/analytics',
       color: 'text-orange-600',
-      roles: ['admin1']
+      roles: ['super-admin']
     },
     {
       id: 'admin',
@@ -72,7 +72,7 @@ const MobileNav = ({ currentPath, userRole }) => {
       icon: Settings,
       path: '/admin',
       color: 'text-red-600',
-      roles: ['admin1']
+      roles: ['super-admin']
     }
   ];
 
@@ -92,7 +92,7 @@ const MobileNav = ({ currentPath, userRole }) => {
   const getMenuItems = () => {
     let items = [...baseMenuItems];
     
-    if (userRole === 'admin1' || userRole === 'admin2') {
+    if (userRole === 'super-admin') {
       items = [...items, ...adminMenuItems];
     }
     
