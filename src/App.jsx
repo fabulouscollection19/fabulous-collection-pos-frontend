@@ -148,6 +148,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Tailor routes */}
           <Route
             path="tailor-work"
             element={
@@ -156,10 +158,13 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Catch-all: redirect unknown routes to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
+        {/* Catch-all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

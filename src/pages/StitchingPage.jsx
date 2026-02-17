@@ -1,43 +1,64 @@
-// StitchingPage.jsx - Updated with search functionality
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Ruler, Calendar, User, Phone, CheckCircle, XCircle, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Briefcase, Calendar, User, Phone, Plus, Trash, Search, Edit, X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Button, Card, PageHeader, Input } from '../components/UIComponents';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 
 const StitchingPage = () => {
-  const [stitchingData, setStitchingData] = useState([]);
+  const [ordersData, setOrdersData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [assigningId, setAssigningId] = useState(null);
-  const [dueDate, setDueDate] = useState('');
+  const [assignmentUIState, setAssignmentUIState] = useState({});
+  const [assigningTailorName, setAssigningTailorName] = useState('');
   const [error, setError] = useState('');
-  const [searchMode, setSearchMode] = useState('today'); // 'today' or 'search'
+  const [searchMode, setSearchMode] = useState('today');
   const [customerNumber, setCustomerNumber] = useState('');
   const [searching, setSearching] = useState(false);
+  const [orderAssignments, setOrderAssignments] = useState({});
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [editableNotes, setEditableNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
-    loadTodayStitching();
+    loadTodayOrders();
   }, []);
 
-  const loadTodayStitching = async () => {
+  const loadTodayOrders = async () => {
+    setLoading(true);
     try {
       setError('');
       setSearchMode('today');
-      const response = await fetch(`${API_BASE}/api/today-stitching`);
+      const response = await fetch(`${API_BASE}/api/orders`);
       if (response.ok) {
         const data = await response.json();
-        setStitchingData(data);
+        setOrdersData(data);
         setFilteredData(data);
+        await loadAssignmentsForOrders(data);
       } else {
-        throw new Error('Failed to load stitching data');
+        throw new Error('Failed to load orders');
       }
     } catch (err) {
-      console.error("Error loading today's stitching:", err);
-      setError('Failed to load stitching data: ' + err.message);
+      setError('Failed to load orders: ' + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAssignmentsForOrders = async (orders) => {
+    const assignments = {};
+    for (const order of orders) {
+      try {
+        const response = await fetch(`${API_BASE}/api/assignments/order/${order.order_id}`);
+        if (response.ok) {
+          const data = await response.json();
+          assignments[order.order_id] = data;
+        }
+      } catch (err) {
+        console.error(`Error loading assignments for order ${order.order_id}:`, err);
+      }
+    }
+    setOrderAssignments(assignments);
   };
 
   const searchByCustomerNumber = async () => {
@@ -49,17 +70,17 @@ const StitchingPage = () => {
     try {
       setSearching(true);
       setError('');
-      const response = await fetch(`${API_BASE}/api/stitching-history/phone/${customerNumber}`);
+      const response = await fetch(`${API_BASE}/api/orders?phone=${customerNumber}`);
       if (response.ok) {
         const data = await response.json();
-        setStitchingData(data);
+        setOrdersData(data);
         setFilteredData(data);
         setSearchMode('search');
+        await loadAssignmentsForOrders(data);
       } else {
-        throw new Error('Customer not found or no stitching history');
+        throw new Error('No orders found for this customer');
       }
     } catch (err) {
-      console.error("Error searching customer:", err);
       setError('Error searching customer: ' + err.message);
     } finally {
       setSearching(false);
@@ -68,330 +89,321 @@ const StitchingPage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
-  const assignWork = async (stitchingId) => {
-
-    if (!stitchingId) {
-      setError('Invalid stitching data: missing stitching ID');
-      return;
-    }
-
-    if (!dueDate) {
-      setError('Please select a due date');
+  const assignWork = async (orderId) => {
+    if (!assigningTailorName.trim()) {
+      setError('Please enter tailor name');
       return;
     }
 
     try {
       setError('');
-      const url = `${API_BASE}/api/assign-stitching/${stitchingId}`;
-
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch(`${API_BASE}/api/assignments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          due_date: dueDate
+          order_id: orderId,
+          tailor_name: assigningTailorName.trim()
         })
       });
 
-      
-
       if (response.ok) {
-        const result = await response.json();
-        // Reload data based on current mode
-        if (searchMode === 'today') {
-          await loadTodayStitching();
-        } else {
-          await searchByCustomerNumber();
-        }
-        setAssigningId(null);
-        setDueDate('');
-        alert('Work assigned successfully!');
+        setAssignmentUIState({ ...assignmentUIState, [orderId]: false });
+        setAssigningTailorName('');
+        if (searchMode === 'today') await loadTodayOrders();
+        else await searchByCustomerNumber();
       } else {
         const errorText = await response.text();
-        console.error("Server error response:", errorText);
-        throw new Error(errorText || 'Failed to assign work');
+        throw new Error(errorText || 'Failed to assign order');
       }
     } catch (err) {
-      console.error("Error assigning work:", err);
       setError('Error assigning work: ' + err.message);
     }
   };
 
-  const unassignWork = async (stitchingId) => {
-    if (!stitchingId) {
-      setError('Invalid stitching ID');
-      return;
-    }
-
-    if (!confirm('Are you sure you want to unassign this work?')) return;
+  const unassignWork = async (assignmentId) => {
+    if (!confirm('Are you sure you want to unassign this tailor?')) return;
 
     try {
       setError('');
-      const response = await fetch(`${API_BASE}/api/unassign-stitching/${stitchingId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        }
+      const response = await fetch(`${API_BASE}/api/assignments/${assignmentId}`, {
+        method: "DELETE"
       });
 
       if (response.ok) {
-        // Reload data based on current mode
-        if (searchMode === 'today') {
-          await loadTodayStitching();
-        } else {
-          await searchByCustomerNumber();
-        }
-        alert('Work unassigned successfully!');
+        if (searchMode === 'today') await loadTodayOrders();
+        else await searchByCustomerNumber();
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to unassign work');
+        throw new Error(errorData.error || 'Failed to unassign tailor');
       }
     } catch (err) {
-      console.error("Error unassigning work:", err);
       setError('Error unassigning work: ' + err.message);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      'Not Assigned': { color: 'bg-gray-100 text-gray-800', label: 'Not Assigned' },
-      'Assigned': { color: 'bg-blue-100 text-blue-800', label: 'Assigned' },
-      'Completed': { color: 'bg-green-100 text-green-800', label: 'Completed' }
-    };
+  const startEditNotes = (order) => {
+    setEditingOrder(order);
+    setEditableNotes(order.notes || '');
+  };
 
-    const config = statusConfig[status] || statusConfig['Not Assigned'];
+  const saveOrderNotes = async () => {
+    if (!editingOrder) return;
+    setSavingNotes(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/orders/${editingOrder.order_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: editableNotes })
+      });
+
+      if (response.ok) {
+        setFilteredData(filteredData.map(order =>
+          order.order_id === editingOrder.order_id ? { ...order, notes: editableNotes } : order
+        ));
+        setEditingOrder(null);
+        setEditableNotes('');
+      } else {
+        throw new Error('Failed to update notes');
+      }
+    } catch (err) {
+      alert('Error updating notes: ' + err.message);
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const config = {
+      'pending': { icon: Clock, className: 'bg-amber-50 text-amber-600 border-amber-100', label: 'Pending' },
+      'in-progress': { icon: Briefcase, className: 'bg-indigo-50 text-indigo-600 border-indigo-100', label: 'Processing' },
+      'completed': { icon: CheckCircle, className: 'bg-emerald-50 text-emerald-600 border-emerald-100', label: 'Ready' }
+    }[status] || { icon: AlertCircle, className: 'bg-slate-50 text-slate-600 border-slate-100', label: status };
+
+    const Icon = config.icon;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${config.className}`}>
+        <Icon className="w-3 h-3" />
         {config.label}
       </span>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-            <Ruler className="w-6 h-6 text-purple-600" />
+    <div className="container-tablet">
+      <PageHeader
+        title="Stitching Management"
+        subtitle="Staff assignment and order tracking pipeline"
+        icon={Briefcase}
+        actions={
+          <div className="flex items-center gap-3">
+            <Button
+              variant={searchMode === 'today' ? 'primary' : 'secondary'}
+              onClick={loadTodayOrders}
+              className="h-10 text-xs"
+            >
+              Today's Orders
+            </Button>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Search className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search phone..."
+                value={customerNumber}
+                onChange={(e) => setCustomerNumber(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && searchByCustomerNumber()}
+                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none w-48 focus:w-64 transition-all"
+              />
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Stitching Management</h2>
-            <p className="text-gray-600">
-              {searchMode === 'today' ? "Today's stitching entries" : "Customer stitching history"}
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Mode Selection Buttons */}
-      <div className="flex space-x-4">
-        <button
-          onClick={loadTodayStitching}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            searchMode === 'today'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Today's Stitching
-        </button>
-
-        <div className="flex-1 flex space-x-2">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Enter customer number to search..."
-              value={customerNumber}
-              onChange={(e) => setCustomerNumber(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              onKeyPress={(e) => e.key === 'Enter' && searchByCustomerNumber()}
-            />
-            <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
-          </div>
-          <button
-            onClick={searchByCustomerNumber}
-            disabled={searching}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {searching ? 'Searching...' : 'Search'}
-          </button>
-        </div>
-      </div>
-
-      {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
-        </div>
+        <Card className="border-rose-100 bg-rose-50 mb-6 p-4 border flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-rose-500" />
+          <p className="text-sm font-black text-rose-600 uppercase tracking-widest">{error}</p>
+        </Card>
       )}
 
-      {/* Stitching Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-2xl shadow-lg border border-gray-200"
-      >
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {searchMode === 'today' ? "Today's Stitching Measurements" : "Customer Stitching History"}
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            {filteredData.length} entries found
-            {searchMode === 'search' && ` for customer: ${customerNumber}`}
-          </p>
-        </div>
-
+      <Card className="p-0 overflow-hidden border-slate-100">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Measurements
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Instructions
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Due Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Entry Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer & Order</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Workflow Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Staff</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Instructions</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Timeline</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredData.map((stitching) => (
-                <tr key={stitching.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                        <User className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {stitching.customer_name}
-                        </div>
-                        <div className="text-sm text-gray-500 flex items-center">
-                          <Phone className="w-3 h-3 mr-1" />
-                          {stitching.customer_number}
-                        </div>
-                      </div>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Deploying Pipeline...</p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="space-y-1">
-                      {stitching.measurements?.C && <div>C: {stitching.measurements.C} cm</div>}
-                      {stitching.measurements?.W && <div>W: {stitching.measurements.W} cm</div>}
-                      {stitching.measurements?.S && <div>S: {stitching.measurements.S} cm</div>}
-                      {stitching.measurements?.H && <div>H: {stitching.measurements.H} cm</div>}
-                      {stitching.measurements?.SH && <div>SH: {stitching.measurements.SH} cm</div>}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                    {stitching.measurements?.notes || 'No special instructions'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(stitching.assigned_status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {stitching.due_date ? formatDate(stitching.due_date) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatDate(stitching.timestamp)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {assigningId === stitching.id ? (
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="date"
-                          value={dueDate}
-                          onChange={(e) => setDueDate(e.target.value)}
-                          className="border rounded-lg px-2 py-1 text-sm"
-                          min={new Date().toISOString().split('T')[0]}
-                        />
-                        <button
-                          onClick={() => assignWork(stitching.id)}
-                          className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 text-sm"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAssigningId(null);
-                            setDueDate('');
-                            setError('');
-                          }}
-                          className="bg-gray-500 text-white px-3 py-1 rounded-lg hover:bg-gray-600 text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : stitching.assigned_status === 'Assigned' ? (
-                      <button
-                        onClick={() => unassignWork(stitching.id)}
-                        className="flex items-center space-x-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 text-sm"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>Unassign</span>
-                      </button>
-                    ) : stitching.assigned_status === 'Not Assigned' ? (
-                      <button
-                        onClick={() => {
-                          setAssigningId(stitching.id);
-                          setError('');
-                        }}
-                        className="flex items-center space-x-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Assign Work</span>
-                      </button>
-                    ) : (
-                      <span className="text-gray-500">Completed</span>
-                    )}
                   </td>
                 </tr>
-              ))}
+              ) : filteredData.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center">
+                        <Briefcase className="w-6 h-6 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-500">No active orders found.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredData.map((order, idx) => {
+                const assignments = orderAssignments[order.order_id] || [];
+                const activeAssignment = assignments.find(a => a.status === 'assigned' || a.status === 'in-progress');
+                const isAssigning = assignmentUIState[order.order_id];
+
+                return (
+                  <motion.tr
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: idx * 0.05 }}
+                    key={order.order_id}
+                    className="group hover:bg-slate-50/50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black">
+                          {order.customer_name?.[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-black text-slate-900 leading-tight">#{order.order_id} {order.customer_name}</p>
+                          <p className="text-[10px] font-bold text-slate-400 tracking-widest">{order.customer_number}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {getStatusBadge(order.status)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {activeAssignment ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                          <span className="font-black text-xs text-indigo-600 uppercase tracking-wide">{activeAssignment.tailor_name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-[11px] font-medium text-slate-500 max-w-[200px] line-clamp-2">{order.notes || 'No specific requests.'}</p>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="inline-flex flex-col items-end">
+                        <span className="text-xs font-black text-slate-900 leading-none">{formatDate(order.created_at)}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Invoiced Date</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => startEditNotes(order)}
+                          className="h-8 w-8 !p-0"
+                          title="Edit Notes"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+
+                        {isAssigning ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Name"
+                              value={assigningTailorName}
+                              onChange={(e) => setAssigningTailorName(e.target.value)}
+                              className="w-24 h-8 text-[10px] font-bold uppercase"
+                              onKeyPress={(e) => e.key === 'Enter' && assignWork(order.order_id)}
+                            />
+                            <Button variant="success" onClick={() => assignWork(order.order_id)} className="h-8 !px-2">OK</Button>
+                            <Button variant="ghost" onClick={() => setAssignmentUIState({ ...assignmentUIState, [order.order_id]: false })} className="h-8 !px-2"><X className="w-3 h-3" /></Button>
+                          </div>
+                        ) : activeAssignment ? (
+                          <Button
+                            variant="danger"
+                            onClick={() => unassignWork(activeAssignment.assignment_id)}
+                            className="h-8 px-3 text-[10px]"
+                          >
+                            Unassign
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            onClick={() => setAssignmentUIState({ ...assignmentUIState, [order.order_id]: true })}
+                            className="h-8 px-3 text-[10px]"
+                          >
+                            Assign Staff
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
-
-          {filteredData.length === 0 && (
-            <div className="text-center py-12">
-              <Ruler className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {searchMode === 'today' ? 'No stitching entries today' : 'No stitching history found'}
-              </h3>
-              <p className="text-gray-600">
-                {searchMode === 'today'
-                  ? 'Stitching measurements added today will appear here.'
-                  : 'No stitching measurements found for this customer number.'}
-              </p>
-            </div>
-          )}
         </div>
-      </motion.div>
+      </Card>
+
+      <AnimatePresence>
+        {editingOrder && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="w-full max-w-lg"
+            >
+              <Card
+                title={`Refine Instructions - ID ${editingOrder.order_id}`}
+                subtitle="Update patterns or sizing notes for this order"
+              >
+                <div className="space-y-4">
+                  <textarea
+                    value={editableNotes}
+                    onChange={(e) => setEditableNotes(e.target.value)}
+                    placeholder="Enter technical notes, pattern requests, or fabric details..."
+                    className="w-full bg-slate-50 border-slate-200 rounded-2xl p-4 text-sm font-medium min-h-[160px] focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 mt-4">
+                    <Button
+                      variant="primary"
+                      className="flex-1"
+                      onClick={saveOrderNotes}
+                      loading={savingNotes}
+                    >
+                      Apply Changes
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditingOrder(null)}>Cancel</Button>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

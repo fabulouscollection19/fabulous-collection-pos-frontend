@@ -116,13 +116,15 @@ const MobileNav = ({ currentPath, userRole }) => {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-      >
-        <Menu className="w-6 h-6" />
-      </button>
+      {/* Mobile Menu Button - Hidden for tailors */}
+      {userRole !== 'tailor' && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      )}
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -154,7 +156,7 @@ const MobileNav = ({ currentPath, userRole }) => {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">Fabulous Collection</h2>
-                      <p className="text-xs text-gray-500">POS System</p>
+                      {userRole !== 'tailor' && <p className="text-xs text-gray-500">POS System</p>}
                       {userRole && (
                         <p className="text-xs text-blue-600 font-medium capitalize">{userRole}</p>
                       )}

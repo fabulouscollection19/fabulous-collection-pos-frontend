@@ -1,52 +1,45 @@
 import { motion } from 'framer-motion';
 import { LogOut, User, Bell } from 'lucide-react';
 
-const Header = ({ onLogout }) => {
-  const handleLogout = () => {
-    onLogout();
-  };
-
+const Header = ({ onLogout, userName, userRole }) => {
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+    <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-3">
       <div className="flex items-center justify-between">
-        {/* Page Title */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-600">Welcome back to Fabulous Collection POS</p>
+        {/* Page Identity - For mobile/tablet */}
+        <div className="flex items-center gap-3">
+          <div className="md:hidden w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
+            <User className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">Terminal 01</h1>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{userRole || 'Admin'}</p>
+          </div>
         </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-          </motion.button>
+        {/* Action Center */}
+        <div className="flex items-center gap-2 md:gap-4">
+
+          <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
 
           {/* User Profile */}
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
+          <div className="flex items-center gap-3 pl-2">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-semibold text-slate-900 leading-none">{userName || 'Admin User'}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase tracking-tighter font-medium">Session Active</p>
             </div>
-            <div className="hidden md:block">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500">admin@fabulouscollection.com</p>
+            <div className="w-9 h-9 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center text-slate-600">
+              <User className="w-5 h-5" />
             </div>
           </div>
 
-          {/* Logout Button */}
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleLogout}
-            className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onLogout}
+            className="ml-2 p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all group"
+            title="Logout"
           >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:block text-sm font-medium">Logout</span>
+            <LogOut className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
           </motion.button>
         </div>
       </div>

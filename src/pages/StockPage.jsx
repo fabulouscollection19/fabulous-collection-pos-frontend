@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Package, Plus, X, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Package, Plus, X, Search, Edit, Filter, Trash2, ArrowUpDown, RefreshCw } from 'lucide-react';
+import { Button, Card, Input, Select, PageHeader } from '../components/UIComponents';
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
 
@@ -13,12 +14,13 @@ const StockPage = () => {
   const [lookupSKU, setLookupSKU] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [lookupError, setLookupError] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingSku, setEditingSku] = useState(null);
 
   const [formData, setFormData] = useState({
     sku: '',
     product_name: '',
     category: '',
-    subcategory: '',
     brand: '',
     fabric_type: '',
     color: '',
@@ -32,147 +34,122 @@ const StockPage = () => {
     date_added: new Date().toISOString().split('T')[0]
   });
 
-  // Dropdown options
   const dropdownOptions = {
     category: [
-      'Saree', 'Dress', 'Kurti', 'Lehenga', 'Blouse', 'Gown',
-      'Salwar Suit', 'Palazzo', 'Top', 'Skirt'
+      { value: 'Saree', label: 'Saree' }, { value: 'Dress', label: 'Dress' }, { value: 'Kurti', label: 'Kurti' },
+      { value: 'Lehenga', label: 'Lehenga' }, { value: 'Blouse', label: 'Blouse' }, { value: 'Gown', label: 'Gown' },
+      { value: 'Salwar Suit', label: 'Salwar Suit' }, { value: 'Palazzo', label: 'Palazzo' },
+      { value: 'Top', label: 'Top' }, { value: 'Skirt', label: 'Skirt' }
     ],
-    subcategory: {
-      'Saree': ['Silk', 'Cotton', 'Georgette', 'Chiffon', 'Net', 'Banarasi'],
-      'Dress': ['Casual', 'Formal', 'Party', 'Summer', 'Winter'],
-      'Kurti': ['Anarkali', 'Straight', 'A-line', 'Angrakha'],
-      'Lehenga': ['Bridal', 'Party', 'Traditional'],
-      'Blouse': ['Designer', 'Simple', 'Backless'],
-      'Gown': ['Evening', 'Cocktail', 'Bridal'],
-      'Salwar Suit': ['Patiala', 'Churidar', 'Patiala Suit'],
-      'Palazzo': ['Printed', 'Solid', 'Embroidered'],
-      'Top': ['Crop', 'Off-shoulder', 'High-neck'],
-      'Skirt': ['A-line', 'Pencil', 'Wrap']
-    },
     fabric_type: [
-      'Silk', 'Cotton', 'Georgette', 'Chiffon', 'Linen', 'Velvet',
-      'Satin', 'Crepe', 'Net', 'Jacquard', 'Organza', 'Polyester'
+      { value: 'Silk', label: 'Silk' }, { value: 'Cotton', label: 'Cotton' }, { value: 'Georgette', label: 'Georgette' },
+      { value: 'Chiffon', label: 'Chiffon' }, { value: 'Linen', label: 'Linen' }, { value: 'Velvet', label: 'Velvet' }
     ],
     color: [
-      'Red', 'Blue', 'Green', 'Black', 'White', 'Pink', 'Yellow',
-      'Purple', 'Orange', 'Brown', 'Grey', 'Maroon', 'Navy Blue',
-      'Peach', 'Lavender', 'Teal', 'Magenta', 'Cream', 'Gold', 'Silver'
+      { value: 'Red', label: 'Red' }, { value: 'Blue', label: 'Blue' }, { value: 'Green', label: 'Green' },
+      { value: 'Black', label: 'Black' }, { value: 'White', label: 'White' }, { value: 'Gold', label: 'Gold' }
     ],
     pattern: [
-      'Solid', 'Floral', 'Striped', 'Polka Dot', 'Geometric', 'Abstract',
-      'Paisley', 'Animal Print', 'Chevron', 'Plaid', 'Embroidered',
-      'Printed', 'Sequined', 'Zari Work', 'Mirror Work'
+      { value: 'Solid', label: 'Solid' }, { value: 'Floral', label: 'Floral' }, { value: 'Striped', label: 'Striped' },
+      { value: 'Embroidered', label: 'Embroidered' }, { value: 'Printed', label: 'Printed' }
     ],
     size: [
-      'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL',
-      'Free Size', '28', '30', '32', '34', '36', '38', '40'
+      { value: 'S', label: 'S' }, { value: 'M', label: 'M' }, { value: 'L', label: 'L' },
+      { value: 'XL', label: 'XL' }, { value: 'Free Size', label: 'Free Size' }
     ]
   };
 
-  // Fetch stock data
   useEffect(() => {
-    const fetchStockData = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/stock`);
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-        const data = await res.json();
-        setStockData(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchStockData();
   }, []);
 
-  // Generate SKU
-// Generate SKU
-    const generateSKU = async (category) => {
-      if (!category) return '';
+  const fetchStockData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/stock`);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      // Sort by stock_quantity descending and take top 10 as default
+      const sortedData = [...data].sort((a, b) => b.stock_quantity - a.stock_quantity).slice(0, 10);
+      setStockData(sortedData);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      try {
-        const res = await fetch(`${API_BASE}/api/last-sku`);
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-        const data = await res.json();
-
-        const categoryPrefix = category.slice(0, 2).toUpperCase();
-        let nextNumber = 10001;
-
-        if (data.lastSku) {
-          // Extract only the numeric part from the last SKU (remove any letters)
-          const numericPart = parseInt(data.lastSku.replace(/\D/g, ''), 10);
-          if (!isNaN(numericPart)) {
-            nextNumber = numericPart + 1;
-          }
-        }
-
-        // Always pad to 5 digits for consistency
-        const paddedNumber = nextNumber.toString().padStart(5, '0');
-        return `${categoryPrefix}${paddedNumber}`;
-      } catch (err) {
-        console.error("Error generating SKU:", err);
-        // Fallback: category prefix + 10001
-        return `${category.slice(0, 2).toUpperCase()}10001`;
+  const generateSKU = async (category) => {
+    if (!category) return '';
+    try {
+      const res = await fetch(`${API_BASE}/api/last-sku`);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const data = await res.json();
+      const categoryPrefix = category.slice(0, 2).toUpperCase();
+      let nextNumber = 10001;
+      if (data.lastSku) {
+        const numericPart = parseInt(data.lastSku.replace(/\D/g, ''), 10);
+        if (!isNaN(numericPart)) nextNumber = numericPart + 1;
       }
-    };
-
-
+      return `${categoryPrefix}${nextNumber.toString().padStart(5, '0')}`;
+    } catch (err) {
+      return `${category.slice(0, 2).toUpperCase()}10001`;
+    }
+  };
 
   const handleChange = async (e) => {
     const { name, value } = e.target;
     if (name === 'category') {
       const newSku = await generateSKU(value);
-      setFormData(prev => ({
-        ...prev,
-        [name]: value.charAt(0).toUpperCase() + value.slice(1),
-        sku: newSku,
-        subcategory: ''
-      }));
+      setFormData(prev => ({ ...prev, [name]: value, sku: newSku }));
     } else if (['stock_quantity', 'purchase_price', 'selling_price', 'sales_quantity'].includes(name)) {
       setFormData(prev => ({ ...prev, [name]: Number(value) }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value.charAt(0).toUpperCase() + value.slice(1) }));
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/api/stock`, {
-        method: 'POST',
+      const endpoint = isEditMode ? `/api/stock/${editingSku}` : '/api/stock';
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: isEditMode ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-      const newStock = await res.json();
-      setStockData(prev => [...prev, newStock]);
-      setIsOffcanvasOpen(false);
-      setFormData({
-        sku: '',
-        product_name: '',
-        category: '',
-        subcategory: '',
-        brand: '',
-        fabric_type: '',
-        color: '',
-        pattern: '',
-        size: '',
-        supplier_name: '',
-        stock_quantity: '',
-        purchase_price: '',
-        selling_price: '',
-        sales_quantity: 0,
-        date_added: new Date().toISOString().split('T')[0]
-      });
+      const savedStock = await res.json();
+      if (isEditMode) {
+        setStockData(prev => prev.map(item => item.sku === editingSku ? savedStock : item));
+      } else {
+        setStockData(prev => [...prev, savedStock]);
+      }
+      handleCancelEdit();
     } catch (err) {
-      console.error("Error saving stock:", err);
       alert("Error saving stock: " + err.message);
     }
   };
 
-  // Lookup SKU
+  const handleEditSKU = (item) => {
+    setIsEditMode(true);
+    setEditingSku(item.sku);
+    setFormData({ ...item });
+    setIsOffcanvasOpen(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditingSku(null);
+    setIsOffcanvasOpen(false);
+    setFormData({
+      sku: '', product_name: '', category: '', brand: '', fabric_type: '',
+      color: '', pattern: '', size: '', supplier_name: '',
+      stock_quantity: '', purchase_price: '', selling_price: '',
+      sales_quantity: 0, date_added: new Date().toISOString().split('T')[0]
+    });
+  };
+
   const handleLookup = async () => {
     const sku = lookupSKU.trim().toUpperCase();
     if (!sku) return;
@@ -191,178 +168,222 @@ const StockPage = () => {
     }
   };
 
-  if (loading) return <p>Loading stock data...</p>;
-  if (error) return <p className="text-red-600">Error: {error}</p>;
+  const formatDate = (dateString) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+  };
+
+  if (loading) return (
+    <div className="h-96 flex flex-col items-center justify-center gap-4">
+      <RefreshCw className="w-10 h-10 text-indigo-600 animate-spin" />
+      <p className="text-slate-500 font-medium">Loading inventory...</p>
+    </div>
+  );
 
   const tableData = lookupResult || stockData;
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-            <Package className="w-6 h-6 text-green-600" />
+    <div className="container-tablet">
+      <PageHeader
+        title="Inventory Hub"
+        subtitle="Manage product stock, pricing, and specifications"
+        icon={Package}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="secondary" icon={Search} onClick={() => setShowLookup(!showLookup)}>
+              {showLookup ? 'Hide Search' : 'Lookup SKU'}
+            </Button>
+            <Button variant="primary" icon={Plus} onClick={() => setIsOffcanvasOpen(true)}>
+              Add Product
+            </Button>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Stock Management</h2>
-            <p className="text-gray-600">View, lookup, and manage inventory</p>
-          </div>
-        </div>
+        }
+      />
 
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowLookup(!showLookup)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+      <AnimatePresence>
+        {showLookup && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-6"
           >
-            <Search className="w-4 h-4" />
-            <span>Lookup Stock</span>
-          </button>
+            <Card className="bg-slate-50 border-slate-200">
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Enter SKU Code (e.g. SA10023)"
+                    value={lookupSKU}
+                    onChange={(e) => setLookupSKU(e.target.value.toUpperCase())}
+                    className="bg-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleLookup} className="md:w-32">Search</Button>
+                  <Button variant="secondary" onClick={() => { setShowLookup(false); setLookupResult(null); }}>
+                    Reset
+                  </Button>
+                </div>
+              </div>
+              {lookupError && <p className="text-rose-600 text-xs mt-2 font-bold px-1">{lookupError}</p>}
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <button
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-            onClick={() => setIsOffcanvasOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add New Stock</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Lookup Section */}
-      {showLookup && (
-        <div className="flex items-center space-x-3 mb-4">
-          <input
-            type="text"
-            value={lookupSKU}
-            onChange={(e) => setLookupSKU(e.target.value.toUpperCase())}
-            placeholder="Enter SKU (e.g., SR10001)"
-            className="border rounded-lg p-2 w-64"
-          />
-          <button
-            onClick={handleLookup}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            Search
-          </button>
-          <button
-            onClick={() => { setShowLookup(false); setLookupResult(null); }}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-          >
-            Close
-          </button>
-        </div>
-      )}
-
-      {/* Stock Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 overflow-x-auto"
-      >
-        {lookupError && <p className="text-red-600 mb-2">{lookupError}</p>}
-        <table className="min-w-full border border-gray-200 rounded-lg">
-          <thead className="bg-gray-50">
-            <tr>
-              {Object.keys(tableData[0] || {}).map(key => (
-                <th key={key} className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">
-                  {key.replace(/_/g,' ').toUpperCase()}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tableData.map((row,index)=>(
-              <tr key={index} className="hover:bg-gray-50 transition duration-200">
-                {Object.values(row).map((value,idx)=>(
-                  <td key={idx} className="px-4 py-2 text-sm text-gray-600 border-b">{value?.toString() || '—'}</td>
-                ))}
+      <Card className="overflow-hidden border-slate-100 p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[1200px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fabric</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Color</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Pattern</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Size</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Qty</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Selling Price</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">Date Added</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </motion.div>
-
-      {/* Offcanvas Panel (unchanged from your version) */}
-      <motion.div
-        className={`fixed top-0 right-0 h-full w-96 bg-white shadow-xl z-50`}
-        initial={{ x: '100%' }}
-        animate={{ x: isOffcanvasOpen ? 0 : '100%' }}
-        transition={{ type: 'tween', duration: 0.3 }}
-      >
-        <div className="p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold">Add New Stock</h3>
-            <button className="p-2 hover:bg-gray-100 rounded-lg" onClick={() => setIsOffcanvasOpen(false)}>
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            <form className="space-y-3" onSubmit={handleSubmit}>
-              {/* SKU */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">SKU</label>
-                <input name="sku" value={formData.sku} readOnly className="mt-1 w-full border rounded-lg p-2 bg-gray-100" />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">CATEGORY *</label>
-                <select name="category" value={formData.category} onChange={handleChange} className="mt-1 w-full border rounded-lg p-2" required>
-                  <option value="">Select Category</option>
-                  {dropdownOptions.category.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              {/* Subcategory */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700">SUBCATEGORY</label>
-                <select name="subcategory" value={formData.subcategory} onChange={handleChange} className="mt-1 w-full border rounded-lg p-2">
-                  <option value="">Select Subcategory</option>
-                  {formData.category && dropdownOptions.subcategory[formData.category]?.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Other fields */}
-              {['product_name','brand','supplier_name'].map(f => (
-                <div key={f}>
-                  <label className="block text-sm font-medium text-gray-700">{f.replace(/_/g,' ').toUpperCase()}</label>
-                  <input name={f} value={formData[f]} onChange={handleChange} className="mt-1 w-full border rounded-lg p-2" />
-                </div>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {tableData.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4">
+                    <span className="font-black text-slate-900 block leading-none">{item.sku}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-[11px] text-slate-600 font-bold truncate max-w-[150px]">{item.product_name || 'N/A'}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">{item.category || 'N/A'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[11px] font-medium text-slate-600">{item.fabric_type || 'N/A'}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-[11px] font-medium text-slate-600">{item.color || 'N/A'}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-[11px] font-medium text-slate-600">{item.pattern || 'N/A'}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-[11px] font-bold text-slate-700">{item.size || 'N/A'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[11px] font-bold text-slate-600 truncate max-w-[100px] block">{item.supplier_name || 'Generic'}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-xs font-black text-slate-700">
+                      {item.stock_quantity}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <p className="text-xs font-black text-slate-900 leading-tight">₹{item.selling_price.toLocaleString()}</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter mt-1">MRP ₹{item.purchase_price.toLocaleString()}</p>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="text-[11px] font-black text-slate-600 whitespace-nowrap">{formatDate(item.date_added)}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleEditSKU(item)}
+                      className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
               ))}
-
-              {/* Dropdown fields */}
-              {['fabric_type','color','pattern','size'].map(f => (
-                <div key={f}>
-                  <label className="block text-sm font-medium text-gray-700">{f.replace(/_/g,' ').toUpperCase()}</label>
-                  <select name={f} value={formData[f]} onChange={handleChange} className="mt-1 w-full border rounded-lg p-2">
-                    <option value="">Select {f}</option>
-                    {dropdownOptions[f].map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-              ))}
-
-              {['stock_quantity','purchase_price','selling_price','sales_quantity'].map(f => (
-                <div key={f}>
-                  <label className="block text-sm font-medium text-gray-700">{f.replace(/_/g,' ').toUpperCase()}</label>
-                  <input type="number" name={f} value={formData[f]} onChange={handleChange} className="mt-1 w-full border rounded-lg p-2" />
-                </div>
-              ))}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">DATE ADDED</label>
-                <input name="date_added" value={formData.date_added} readOnly className="mt-1 w-full border rounded-lg p-2 bg-gray-100" />
-              </div>
-
-              <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Save</button>
-            </form>
-          </div>
+            </tbody>
+          </table>
         </div>
-      </motion.div>
+      </Card>
+
+      {/* Modern Side Panel */}
+      <AnimatePresence>
+        {isOffcanvasOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCancelEdit}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[70] flex flex-col"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                    {isEditMode ? 'Modify Product' : 'New Product'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-bold tracking-widest uppercase mt-1">Inventory Management</p>
+                </div>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="SKU Code" value={formData.sku} readOnly disabled className="bg-slate-50 font-bold" />
+                  <Select
+                    label="Category *"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    options={dropdownOptions.category}
+                  />
+                </div>
+
+                <Input
+                  label="Product Name"
+                  name="product_name"
+                  value={formData.product_name}
+                  onChange={handleChange}
+                  placeholder="e.g. Designer Silk Saree with Zari"
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Select label="Fabric" name="fabric_type" value={formData.fabric_type} onChange={handleChange} options={dropdownOptions.fabric_type} />
+                  <Select label="Color" name="color" value={formData.color} onChange={handleChange} options={dropdownOptions.color} />
+                  <Select label="Pattern" name="pattern" value={formData.pattern} onChange={handleChange} options={dropdownOptions.pattern} />
+                  <Select label="Size" name="size" value={formData.size} onChange={handleChange} options={dropdownOptions.size} />
+                </div>
+
+                <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
+                  <Input label="Stock Qty" type="number" name="stock_quantity" value={formData.stock_quantity} onChange={handleChange} />
+                  <Input label="Supplier" name="supplier_name" value={formData.supplier_name} onChange={handleChange} />
+                  <Input label="Purchase Price" type="number" name="purchase_price" value={formData.purchase_price} onChange={handleChange} />
+                  <Input label="Selling Price" type="number" name="selling_price" value={formData.selling_price} onChange={handleChange} />
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <Button onClick={handleSubmit} className="flex-1 py-4 text-base shadow-xl shadow-indigo-600/10">
+                  {isEditMode ? 'Update Inventory' : 'Confirm & Save'}
+                </Button>
+                <Button variant="secondary" onClick={handleCancelEdit} className="py-4">Cancel</Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
