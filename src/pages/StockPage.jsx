@@ -17,6 +17,11 @@ const StockPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSku, setEditingSku] = useState(null);
 
+  // Pagination & Filter States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedDate, setSelectedDate] = useState('');
+
   const [formData, setFormData] = useState({
     sku: '',
     product_name: '',
@@ -60,18 +65,24 @@ const StockPage = () => {
   };
 
   useEffect(() => {
-    fetchStockData();
-  }, []);
+    fetchStockData(currentPage, selectedDate);
+  }, [currentPage, selectedDate]);
 
-  const fetchStockData = async () => {
+  const fetchStockData = async (page = 1, date = '') => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/stock`);
+      const url = new URL(`${API_BASE}/api/stock`);
+      url.searchParams.append('page', page);
+      url.searchParams.append('limit', 10);
+      if (date) url.searchParams.append('date', date);
+
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
       const data = await res.json();
-      // Sort by stock_quantity descending and take top 10 as default
-      const sortedData = [...data].sort((a, b) => b.stock_quantity - a.stock_quantity).slice(0, 10);
-      setStockData(sortedData);
+
+      setStockData(data.products || []);
+      setTotalPages(data.totalPages || 1);
+      setCurrentPage(data.currentPage || 1);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -86,14 +97,19 @@ const StockPage = () => {
       if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
       const data = await res.json();
       const categoryPrefix = category.slice(0, 2).toUpperCase();
+
       let nextNumber = 10001;
       if (data.lastSku) {
-        const numericPart = parseInt(data.lastSku.replace(/\D/g, ''), 10);
-        if (!isNaN(numericPart)) nextNumber = numericPart + 1;
+        // More robust numeric extraction in case of mixed formats
+        const match = data.lastSku.match(/\d+$/);
+        const numericPart = match ? parseInt(match[0], 10) : 0;
+
+        // Ensure we don't look before 10009 as per user request (logic: next is max(current+1, 10010))
+        nextNumber = Math.max(numericPart + 1, 10010);
       }
       return `${categoryPrefix}${nextNumber.toString().padStart(5, '0')}`;
     } catch (err) {
-      return `${category.slice(0, 2).toUpperCase()}10001`;
+      return `${category.slice(0, 2).toUpperCase()}10010`;
     }
   };
 
@@ -192,15 +208,42 @@ const StockPage = () => {
         icon={Package}
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" icon={Search} onClick={() => setShowLookup(!showLookup)}>
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                <Filter className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setCurrentPage(1);
+                  setLookupResult(null);
+                }}
+                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 outline-none transition-all shadow-sm h-10"
+              />
+            </div>
+            {selectedDate && (
+              <Button variant="secondary" onClick={() => setSelectedDate('')} className="h-10">Clear Date</Button>
+            )}
+            <Button variant="secondary" icon={Search} onClick={() => setShowLookup(!showLookup)} className="h-10">
               {showLookup ? 'Hide Search' : 'Lookup SKU'}
             </Button>
-            <Button variant="primary" icon={Plus} onClick={() => setIsOffcanvasOpen(true)}>
+            <Button variant="primary" icon={Plus} onClick={() => setIsOffcanvasOpen(true)} className="h-10">
               Add Product
             </Button>
           </div>
         }
       />
+
+      {selectedDate && (
+        <div className="mb-4 flex items-center gap-2 px-1">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Date:</span>
+          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+            {new Date(selectedDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </span>
+        </div>
+      )}
 
       <AnimatePresence>
         {showLookup && (
@@ -304,6 +347,50 @@ const StockPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Improved Pagination Controls */}
+        {!lookupResult && totalPages > 1 && (
+          <div className="border-t border-slate-100 p-6 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+              Page <span className="text-slate-900">{currentPage}</span> of <span className="text-slate-900">{totalPages}</span>
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="h-9 px-4 text-xs font-bold"
+              >
+                Previous
+              </Button>
+
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${currentPage === page
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-400'
+                      }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="h-9 px-4 text-xs font-bold"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Modern Side Panel */}
