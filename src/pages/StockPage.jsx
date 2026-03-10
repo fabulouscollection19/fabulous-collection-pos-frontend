@@ -47,18 +47,22 @@ const StockPage = () => {
       { value: 'Top', label: 'Top' }, { value: 'Skirt', label: 'Skirt' }
     ],
     fabric_type: [
+      { value: 'N/A', label: 'N/A' },
       { value: 'Silk', label: 'Silk' }, { value: 'Cotton', label: 'Cotton' }, { value: 'Georgette', label: 'Georgette' },
       { value: 'Chiffon', label: 'Chiffon' }, { value: 'Linen', label: 'Linen' }, { value: 'Velvet', label: 'Velvet' }
     ],
     color: [
+      { value: 'N/A', label: 'N/A' },
       { value: 'Red', label: 'Red' }, { value: 'Blue', label: 'Blue' }, { value: 'Green', label: 'Green' },
       { value: 'Black', label: 'Black' }, { value: 'White', label: 'White' }, { value: 'Gold', label: 'Gold' }
     ],
     pattern: [
+      { value: 'N/A', label: 'N/A' },
       { value: 'Solid', label: 'Solid' }, { value: 'Floral', label: 'Floral' }, { value: 'Striped', label: 'Striped' },
       { value: 'Embroidered', label: 'Embroidered' }, { value: 'Printed', label: 'Printed' }
     ],
     size: [
+      { value: 'N/A', label: 'N/A' },
       { value: 'S', label: 'S' }, { value: 'M', label: 'M' }, { value: 'L', label: 'L' },
       { value: 'XL', label: 'XL' }, { value: 'Free Size', label: 'Free Size' }
     ]
@@ -127,14 +131,43 @@ const StockPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    const requiredFields = {
+      category: 'Category',
+      stock_quantity: 'Stock Qty',
+      purchase_price: 'Purchase Price',
+      selling_price: 'Selling Price'
+    };
+
+    for (const [field, label] of Object.entries(requiredFields)) {
+      const value = formData[field];
+      if (value === '' || value === null || value === undefined) {
+        alert(`❌ ${label} is required!`);
+        return;
+      }
+    }
+
     try {
+      // Prepare data with proper numeric conversions
+      const dataToSubmit = {
+        ...formData,
+        stock_quantity: Number(formData.stock_quantity) || 0,
+        purchase_price: Number(formData.purchase_price) || 0,
+        selling_price: Number(formData.selling_price) || 0,
+        sales_quantity: Number(formData.sales_quantity) || 0
+      };
+
       const endpoint = isEditMode ? `/api/stock/${editingSku}` : '/api/stock';
       const res = await fetch(`${API_BASE}${endpoint}`, {
         method: isEditMode ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(dataToSubmit)
       });
-      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || `HTTP error! Status: ${res.status}`);
+      }
       const savedStock = await res.json();
       if (isEditMode) {
         setStockData(prev => prev.map(item => item.sku === editingSku ? savedStock : item));
@@ -444,6 +477,14 @@ const StockPage = () => {
                   value={formData.product_name}
                   onChange={handleChange}
                   placeholder="e.g. Designer Silk Saree with Zari"
+                />
+
+                <Input
+                  label="Brand"
+                  name="brand"
+                  value={formData.brand}
+                  onChange={handleChange}
+                  placeholder="e.g. Premium Collection"
                 />
 
                 <div className="grid grid-cols-2 gap-4">
